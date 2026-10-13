@@ -1,0 +1,81 @@
+name: Neues PhotoCraft-Release übernehmen
+
+on:
+  # Stündlich; bewusst nicht zur vollen Stunde, da GitHub dann Läufe oft verzögert oder auslässt
+  schedule:
+    - cron: "17 * * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+env:
+  UPSTREAM_REPO: storytold/photocraft
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # Versionsanhebung auf main committen
+      actions: write # Build-Workflow anstoßen
+    steps:
+      - name: Repository auschecken
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+
+      - name: Neuestes Release mit aktueller Version vergleichen
+        id: ver
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          current="$(grep -m1 '^ARG PHOTOCRAFT_VERSION=' Dockerfile | cut -d= -f2)"
+          latest="$(gh api "repos/${UPSTREAM_REPO}/releases/latest" --jq '.tag_name')"
+          latest="${latest#v}"
+          echo "Aktuell: $current, neuestes Release: $latest"
+
+          if ! [[ "$latest" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::warning::Unerwartetes Tag-Format '$latest', übersprungen"
+            exit 0
+          fi
+          if [[ "$latest" == "$current" ]] || [[ "$(printf '%s\n' "$current" "$latest" | sort -V | tail -n1)" != "$latest" ]]; then
+            echo "Kein neueres Release."
+            exit 0
+          fi
+
+          # Assets werden teils erst nach dem Anlegen des Releases hochgeladen;
+          # fehlen sie noch, greift der nächste Lauf
+          assets="$(gh api "repos/${UPSTREAM_REPO}/releases/tags/v${latest}" --jq '.assets[].name')"
+          for f in "photocraft-web-${latest}.zip" SHA256SUMS.txt; do
+            if ! grep -qxF "$f" <<<"$assets"; then
+              echo "::warning::Release v${latest} enthält noch kein '$f', übersprungen"
+              exit 0
+            fi
+          done
+
+          echo "current=$current" >> "$GITHUB_OUTPUT"
+          echo "latest=$latest" >> "$GITHUB_OUTPUT"
+
+      - name: Version in Dockerfile und docker-compose.yml anheben
+        if: steps.ver.outputs.latest != ''
+        env:
+          CURRENT: ${{ steps.ver.outputs.current }}
+          LATEST: ${{ steps.ver.outputs.latest }}
+        run: |
+          sed -i -E "s/^ARG PHOTOCRAFT_VERSION=.*/ARG PHOTOCRAFT_VERSION=${LATEST}/" Dockerfile
+          sed -i -E "s#^(\s*image:.*/photocraft:).*#\1${LATEST}#" docker-compose.yml
+          git diff --stat
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -am "PhotoCraft ${CURRENT} -> ${LATEST}"
+          git push
+
+      # Pushes mit dem GITHUB_TOKEN lösen keine anderen Workflows aus,
+      # daher den Build explizit starten
+      - name: Image-Build anstoßen
+        if: steps.ver.outputs.latest != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run docker-image.yml --ref "${{ github.event.repository.default_branch }}"

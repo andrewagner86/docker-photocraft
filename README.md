@@ -55,7 +55,16 @@ von Hand vornehmen.
 Das Docker-Hub-Repository `<benutzername>/photocraft` wird beim ersten Push automatisch
 angelegt.
 
-Neue PhotoCraft-Version veröffentlichen: `ARG PHOTOCRAFT_VERSION` im Dockerfile und den
+### Neue PhotoCraft-Releases automatisch übernehmen
+
+Der Workflow `.github/workflows/photocraft-release.yml` prüft stündlich (jeweils Minute 17, auch
+manuell startbar) das neueste Release von `storytold/photocraft`. Ist es neuer als die Version im
+Dockerfile und sind Zip und `SHA256SUMS.txt` bereits hochgeladen, hebt er die Version in
+`Dockerfile` und `docker-compose.yml` an, committet direkt auf `main` und startet den
+Docker-Hub-Workflow. Voraussetzung: `main` darf keinen Branch-Schutz haben, der direkte
+Pushes von `github-actions[bot]` verbietet.
+
+Von Hand geht es ebenso: `ARG PHOTOCRAFT_VERSION` im Dockerfile und den
 Image-Tag in `docker-compose.yml` auf dieselbe Version anheben, committen, auf `main` pushen.
 Der Workflow bricht ab, wenn die beiden Versionen nicht übereinstimmen.
 
