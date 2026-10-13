@@ -1,0 +1,16 @@
+version: 2
+updates:
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
+    ignore:
+      # Ungerade Minor-Versionen sind nginx-Mainline; auf den nächsten Stable-Zweig
+      # (gerade Minor-Version, z. B. 1.32) bitte von Hand wechseln
+      - dependency-name: nginxinc/nginx-unprivileged
+        update-types: ["version-update:semver-minor"]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
