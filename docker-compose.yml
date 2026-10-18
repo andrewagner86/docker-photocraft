@@ -1,6 +1,6 @@
 services:
   photocraft:
-    image: andrewagner86/photocraft:0.9.0
+    image: andrewagner86/photocraft:0.10.0
     restart: unless-stopped
     ports:
       - 8080:8080
