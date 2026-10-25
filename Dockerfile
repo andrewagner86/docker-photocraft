@@ -3,7 +3,7 @@
 # Einzige Stelle mit Standardwert für die PhotoCraft-Version.
 # Der GitHub-Workflow liest sie von hier aus. Beim Build überschreibbar:
 #   docker build --build-arg PHOTOCRAFT_VERSION=0.8.3 -t photocraft-web .
-ARG PHOTOCRAFT_VERSION=0.15.1
+ARG PHOTOCRAFT_VERSION=0.16.0
 
 # ---------------------------------------------------------------------------
 # Stage 1: offizielles Release-Zip laden, SHA-256 prüfen, entpacken
